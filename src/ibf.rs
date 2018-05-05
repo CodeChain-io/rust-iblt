@@ -54,8 +54,20 @@ impl<'de, T: Hash + Deserialize<'de> + Serialize, S: BuildHasher> IBF<T, S> {
         Ok(())
     }
 
-    pub fn remove(&mut self, val: &T) {
-        unimplemented!();
+    pub fn remove(&mut self, val: &T) -> Result<(), bincode::Error> {
+        let hash = calc_hash(val, self.hash_builder.build_hasher());
+        let val_bin = bincode::serialize(val)?;
+        let mut index = hash as usize;
+        for _ in 0..self.hash_count {
+            index = calc_hash(&index, self.hash_builder.build_hasher()) as usize;
+            self.map[index % self.size] -= Item {
+                count: 1,
+                val_sum: val_bin.clone(),
+                hash_sum: hash,
+            };
+        }
+
+        Ok(())
     }
 
     pub fn decode(self) -> HashSet<T> {
