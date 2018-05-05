@@ -1,3 +1,4 @@
+use std::fmt::Debug;
 use std::collections::hash_map::{DefaultHasher, HashMap};
 use std::hash::{BuildHasher, BuildHasherDefault, Hash, Hasher};
 use std::marker::PhantomData;
@@ -13,6 +14,7 @@ fn calc_hash<T, H>(val: &T, mut hasher: H) -> u64 where T: Hash, H: Hasher {
     hasher.finish()
 }
 
+#[derive(Debug)]
 pub enum Error {
     DecodeFail,
     MalformedData(bincode::Error),
@@ -27,7 +29,7 @@ pub struct IBLT<K, V, S = BuildHasherDefault<DefaultHasher>> {
 
 impl<K, V> IBLT<K, V, BuildHasherDefault<DefaultHasher>>
 where
-    K: Eq + Hash + DeserializeOwned + Serialize,
+    K: Eq + Hash + DeserializeOwned + Serialize + Debug,
     V: Eq + Hash + DeserializeOwned + Serialize,
 {
     pub fn new(size: usize, hash_count: usize) -> Self {
@@ -37,7 +39,7 @@ where
 
 impl<K, V, S> IBLT<K, V, S>
 where
-    K: Eq + Hash + DeserializeOwned + Serialize,
+    K: Eq + Hash + DeserializeOwned + Serialize + Debug,
     V: Eq + Hash + DeserializeOwned + Serialize,
     S: BuildHasher,
 {
@@ -52,9 +54,9 @@ where
 
     pub fn insert(&mut self, key: &K, val: &V) -> Result<(), bincode::Error> {
         let size = self.map.len();
-        let hash = calc_hash(val, self.hash_builder.build_hasher());
         let key_bin = bincode::serialize(key)?;
         let val_bin = bincode::serialize(val)?;
+        let hash = calc_hash(&key_bin, self.hash_builder.build_hasher());
         let mut index = hash as usize;
         for _ in 0..self.hash_count {
             index = calc_hash(&index, self.hash_builder.build_hasher()) as usize;
@@ -71,9 +73,9 @@ where
 
     pub fn remove(&mut self, key: &K, val: &V) -> Result<(), bincode::Error> {
         let size = self.map.len();
-        let hash = calc_hash(val, self.hash_builder.build_hasher());
         let key_bin = bincode::serialize(key)?;
         let val_bin = bincode::serialize(val)?;
+        let hash = calc_hash(&key_bin, self.hash_builder.build_hasher());
         let mut index = hash as usize;
         for _ in 0..self.hash_count {
             index = calc_hash(&index, self.hash_builder.build_hasher()) as usize;
@@ -91,7 +93,6 @@ where
     pub fn decode(mut self) -> Result<(HashMap<K, V>, HashMap<K, V>), Error> {
         let mut left = HashMap::new();
         let mut right = HashMap::new();
-
         loop {
             let pure_item = self.map.iter().find(|item| {
                 (item.count == 1 || item.count == -1) &&

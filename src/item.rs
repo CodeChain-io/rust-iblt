@@ -1,6 +1,6 @@
 use std::ops::{AddAssign, SubAssign};
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub(crate) struct Item {
     pub(crate) count: isize,
     pub(crate) key_sum: Vec<u8>,
