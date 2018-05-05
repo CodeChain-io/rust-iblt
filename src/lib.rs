@@ -1,7 +1,7 @@
 extern crate bincode;
 extern crate serde;
 
-mod ibf;
+mod iblt;
 mod item;
 
-pub use ibf::{Error, IBF};
+pub use iblt::{Error, IBLT};
