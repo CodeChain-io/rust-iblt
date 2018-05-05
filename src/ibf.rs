@@ -3,18 +3,14 @@ use std::collections::hash_map::DefaultHasher;
 use std::hash::{BuildHasher, BuildHasherDefault, Hash, Hasher};
 use std::marker::PhantomData;
 
-use bincode::serialize;
+use bincode;
 use serde::{Deserialize, Serialize};
+
+use item::Item;
 
 fn calc_hash<T, H>(val: &T, mut hasher: H) -> u64 where T: Hash, H: Hasher {
     val.hash(&mut hasher);
     hasher.finish()
-}
-
-struct Item {
-    count: usize,
-    val_sum: Box<[u8]>,
-    hash_sum: u64,
 }
 
 pub struct IBF<T, S = BuildHasherDefault<DefaultHasher>> {
@@ -33,35 +29,29 @@ impl<'de, T: Hash + Deserialize<'de> + Serialize> IBF<T, BuildHasherDefault<Defa
 
 impl<'de, T: Hash + Deserialize<'de> + Serialize, S: BuildHasher> IBF<T, S> {
     pub fn with_hasher(size: usize, hash_count: usize, hash_builder: S) -> Self {
-        let mut map = Vec::with_capacity(size);
-        for _ in 0..size {
-            map.push(Item {
-                count: 0,
-                val_sum: Box::new([]),
-                hash_sum: 0,
-            });
-        }
-
         Self {
             size,
             hash_count,
-            map,
+            map: vec![Item::default(); size],
             hash_builder,
             phantom: PhantomData,
         }
     }
 
-    pub fn insert(&mut self, val: &T) {
+    pub fn insert(&mut self, val: &T) -> Result<(), bincode::Error> {
         let hash = calc_hash(val, self.hash_builder.build_hasher());
-        let val_bin = serialize(val);
+        let val_bin = bincode::serialize(val)?;
         let mut index = hash as usize;
         for _ in 0..self.hash_count {
             index = calc_hash(&index, self.hash_builder.build_hasher()) as usize;
-            let item = &mut self.map[index % self.size];
-            item.count += 1;
-            item.hash_sum ^= hash;
-            // TODO: insert to val_sum
+            self.map[index % self.size] += Item {
+                count: 1,
+                val_sum: val_bin.clone(),
+                hash_sum: hash,
+            };
         }
+
+        Ok(())
     }
 
     pub fn remove(&mut self, val: &T) {
