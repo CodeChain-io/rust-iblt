@@ -4,7 +4,8 @@ use std::hash::{BuildHasher, BuildHasherDefault, Hash, Hasher};
 use std::marker::PhantomData;
 
 use bincode;
-use serde::{Deserialize, Serialize};
+use serde::de::DeserializeOwned;
+use serde::ser::Serialize;
 
 use item::Item;
 
@@ -20,13 +21,13 @@ pub struct IBF<T, S = BuildHasherDefault<DefaultHasher>> {
     phantom: PhantomData<*const T>,
 }
 
-impl<'de, T: Hash + Deserialize<'de> + Serialize> IBF<T, BuildHasherDefault<DefaultHasher>> {
+impl<T: Eq + Hash + DeserializeOwned + Serialize> IBF<T, BuildHasherDefault<DefaultHasher>> {
     pub fn new(size: usize, hash_count: usize) -> Self {
         Self::with_hasher(size, hash_count, Default::default())
     }
 }
 
-impl<'de, T: Hash + Deserialize<'de> + Serialize, S: BuildHasher> IBF<T, S> {
+impl<T: Eq + Hash + DeserializeOwned + Serialize, S: BuildHasher> IBF<T, S> {
     pub fn with_hasher(size: usize, hash_count: usize, hash_builder: S) -> Self {
         Self {
             hash_count,
@@ -70,7 +71,37 @@ impl<'de, T: Hash + Deserialize<'de> + Serialize, S: BuildHasher> IBF<T, S> {
         Ok(())
     }
 
-    pub fn decode(self) -> HashSet<T> {
-        unimplemented!();
+    pub fn decode(mut self) -> Result<(HashSet<T>, HashSet<T>), (HashSet<T>, HashSet<T>)> {
+        let mut left = HashSet::new();
+        let mut right = HashSet::new();
+
+        loop {
+            let pure_item = self.map.iter().find(|item| {
+                (item.count == 1 || item.count == -1) &&
+                item.hash_sum == calc_hash(&item.val_sum, self.hash_builder.build_hasher())
+            }).cloned();
+
+            if let Some(item) = pure_item {
+                if let Ok(val) = bincode::deserialize(item.val_sum.as_slice()) {
+                    // FIXME: return error on remove failure
+                    self.remove(&val).unwrap();
+                    if item.count > 0 {
+                        left.insert(val);
+                    } else {
+                        right.insert(val);
+                    }
+                } else {
+                    break
+                }
+            } else {
+                break
+            }
+        }
+
+        if self.map.iter().all(|item| item.is_empty()) {
+            Ok((left, right))
+        } else {
+            Err((left, right))
+        }
     }
 }

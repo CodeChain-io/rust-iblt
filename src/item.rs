@@ -2,7 +2,7 @@ use std::ops::{AddAssign, SubAssign};
 
 #[derive(Clone)]
 pub(crate) struct Item {
-    pub(crate) count: usize,
+    pub(crate) count: isize,
     pub(crate) val_sum: Vec<u8>,
     pub(crate) hash_sum: u64,
 }
@@ -14,6 +14,12 @@ fn xor_assign_slice(target: &mut Vec<u8>, rhs: Vec<u8>) {
     }
     for i in 0..rhs.len() {
         target[i] ^= rhs[i];
+    }
+}
+
+impl Item {
+    pub fn is_empty(&self) -> bool {
+        self.count == 0 && self.val_sum.iter().all(|v| *v == 0) && self.hash_sum == 0
     }
 }
 
