@@ -4,4 +4,4 @@ extern crate serde;
 mod ibf;
 mod item;
 
-pub use ibf::IBF;
+pub use ibf::{Error, IBF};

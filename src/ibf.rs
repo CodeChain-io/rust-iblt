@@ -14,6 +14,12 @@ fn calc_hash<T, H>(val: &T, mut hasher: H) -> u64 where T: Hash, H: Hasher {
     hasher.finish()
 }
 
+pub enum Error {
+    DecodeFail,
+    SerializeError(bincode::Error),
+    MalformedData(bincode::Error),
+}
+
 pub struct IBF<T, S = BuildHasherDefault<DefaultHasher>> {
     hash_count: usize,
     map: Vec<Item>,
@@ -71,7 +77,7 @@ impl<T: Eq + Hash + DeserializeOwned + Serialize, S: BuildHasher> IBF<T, S> {
         Ok(())
     }
 
-    pub fn decode(mut self) -> Result<(HashSet<T>, HashSet<T>), (HashSet<T>, HashSet<T>)> {
+    pub fn decode(mut self) -> Result<(HashSet<T>, HashSet<T>), Error> {
         let mut left = HashSet::new();
         let mut right = HashSet::new();
 
@@ -82,16 +88,16 @@ impl<T: Eq + Hash + DeserializeOwned + Serialize, S: BuildHasher> IBF<T, S> {
             }).cloned();
 
             if let Some(item) = pure_item {
-                if let Ok(val) = bincode::deserialize(item.val_sum.as_slice()) {
-                    // FIXME: return error on remove failure
-                    self.remove(&val).unwrap();
-                    if item.count > 0 {
-                        left.insert(val);
-                    } else {
-                        right.insert(val);
+                match bincode::deserialize(item.val_sum.as_slice()) {
+                    Ok(val) => {
+                        self.remove(&val).map_err(|e| Error::SerializeError(e))?;
+                        if item.count > 0 {
+                            left.insert(val);
+                        } else {
+                            right.insert(val);
+                        }
                     }
-                } else {
-                    break
+                    Err(e) => return Err(Error::MalformedData(e)),
                 }
             } else {
                 break
@@ -101,7 +107,7 @@ impl<T: Eq + Hash + DeserializeOwned + Serialize, S: BuildHasher> IBF<T, S> {
         if self.map.iter().all(|item| item.is_empty()) {
             Ok((left, right))
         } else {
-            Err((left, right))
+            Err(Error::DecodeFail)
         }
     }
 }
