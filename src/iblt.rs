@@ -1,5 +1,5 @@
-use std::fmt::Debug;
 use std::collections::hash_map::{DefaultHasher, HashMap};
+use std::fmt::Debug;
 use std::hash::{BuildHasher, BuildHasherDefault, Hash, Hasher};
 use std::marker::PhantomData;
 
@@ -9,7 +9,10 @@ use serde::ser::Serialize;
 
 use item::Item;
 
-fn calc_hash<T, H>(val: &T, mut hasher: H) -> u64 where T: Hash, H: Hasher {
+fn calc_hash<T, H>(val: &T, mut hasher: H) -> u64
+where
+    T: Hash,
+    H: Hasher, {
     val.hash(&mut hasher);
     hasher.finish()
 }
@@ -36,6 +39,8 @@ where
         Self::with_hasher(size, hash_count, Default::default())
     }
 }
+
+pub type DecodeResult<K, V> = Result<(HashMap<K, V>, HashMap<K, V>), Error>;
 
 impl<K, V, S> IBLT<K, V, S>
 where
@@ -90,20 +95,22 @@ where
         Ok(())
     }
 
-    pub fn decode(mut self) -> Result<(HashMap<K, V>, HashMap<K, V>), Error> {
+    pub fn decode(mut self) -> DecodeResult<K, V> {
         let mut left = HashMap::new();
         let mut right = HashMap::new();
         loop {
-            let pure_item = self.map.iter().find(|item| {
-                (item.count == 1 || item.count == -1) &&
-                item.hash_sum == calc_hash(&item.key_sum, self.hash_builder.build_hasher())
-            }).cloned();
+            let pure_item = self
+                .map
+                .iter()
+                .find(|item| {
+                    (item.count == 1 || item.count == -1)
+                        && item.hash_sum == calc_hash(&item.key_sum, self.hash_builder.build_hasher())
+                })
+                .cloned();
 
             if let Some(item) = pure_item {
-                let key = bincode::deserialize(item.key_sum.as_slice())
-                    .map_err(|e| Error::MalformedData(e))?;
-                let val = bincode::deserialize(item.val_sum.as_slice())
-                    .map_err(|e| Error::MalformedData(e))?;
+                let key = bincode::deserialize(item.key_sum.as_slice()).map_err(Error::MalformedData)?;
+                let val = bincode::deserialize(item.val_sum.as_slice()).map_err(Error::MalformedData)?;
                 self.remove(&key, &val).unwrap();
                 if item.count > 0 {
                     left.insert(key, val);

@@ -11,7 +11,7 @@ macro_rules! encode_and_decode {
         let (result, _) = iblt.decode().unwrap();
 
         result
-    }}
+    }};
 }
 
 #[test]

@@ -20,10 +20,10 @@ fn xor_assign_slice(target: &mut Vec<u8>, rhs: Vec<u8>) {
 
 impl Item {
     pub fn is_empty(&self) -> bool {
-        self.count == 0 &&
-        self.key_sum.iter().all(|v| *v == 0) &&
-        self.val_sum.iter().all(|v| *v == 0) &&
-        self.hash_sum == 0
+        self.count == 0
+            && self.key_sum.iter().all(|v| *v == 0)
+            && self.val_sum.iter().all(|v| *v == 0)
+            && self.hash_sum == 0
     }
 }
 
